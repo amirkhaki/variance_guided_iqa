@@ -158,7 +158,7 @@ class WeightedPatchIDFIQA(IDFIQA):
         if self.aggregation == "uniform":
             return torch.ones(flat.shape[0], device=flat.device)
         if self.aggregation == "softmax":
-            scaled = flat / max(self.softmax_temperature, 1e-6)
+            scaled = flat / self.softmax_temperature
             return torch.logsumexp(scaled, dim=1) / math.log(flat.shape[1] + 1.0)
         raise ValueError(f"Unsupported aggregation: {self.aggregation}")
 

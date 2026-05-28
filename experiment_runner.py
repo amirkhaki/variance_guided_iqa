@@ -24,13 +24,19 @@ from iqa_models import BackboneSpec, IDFIQA, WeightedPatchIDFIQA, get_backbone_e
 
 BASE_IQADATASETS = ["LIVE", "CSIQ", "TID2013", "KADID-10k", "PIPAL"]
 PHASE1_DATASETS = ["LIVE", "CSIQ", "TID2013", "KADID-10k", "PIPAL", "JPEG AIC-4"]
+ABLATION_DATASET = "TID2013"
+SENSITIVITY_ANALYSIS_SAMPLE_CAP = 500
+BACKBONE_COMPARISON_SAMPLE_CAP = 1000
+COMPLEXITY_ANALYSIS_SAMPLE_SIZE = 100
 
 
 def logistic_func(x, beta1, beta2, beta3, beta4, beta5):
     """Five-parameter logistic mapping used for PLCC calibration.
 
-    beta1 controls amplitude, beta2 slope, beta3 midpoint, beta4 linear term,
-    and beta5 bias term.
+    Formula:
+    y = beta1 * (0.5 - 1 / (1 + exp(beta2 * (x - beta3)))) + beta4 * x + beta5
+    where beta1 is amplitude, beta2 is slope, beta3 is midpoint, beta4 is
+    linear gain, and beta5 is bias.
     """
     logistic_part = beta2 * (x - beta3)
     clipped = np.clip(logistic_part, -100, 100)
@@ -365,7 +371,15 @@ def run_patch_window_sensitivity(dataset: Dataset, out_dir: str, device: torch.d
             out_csv = os.path.join(out_dir, "phase2", "patch_window_sensitivity", f"patch{patch}_window{window}.csv")
             start = time.perf_counter()
             # Use a capped subset for this dense grid so one full sweep remains practical.
-            pred = infer_dataset(weighted, dataset, device, out_csv, num_workers, batch_size=batch_size, max_samples=500)
+            pred = infer_dataset(
+                weighted,
+                dataset,
+                device,
+                out_csv,
+                num_workers,
+                batch_size=batch_size,
+                max_samples=SENSITIVITY_ANALYSIS_SAMPLE_CAP,
+            )
             elapsed = time.perf_counter() - start
             srcc, plcc, _ = compute_srcc_plcc(pred["pred"], pred["gt"])
             rows.append(
@@ -421,7 +435,15 @@ def run_backbone_comparison(dataset: Dataset, out_dir: str, device: torch.device
         aggregation="max",
     )
     out_csv = os.path.join(out_dir, "phase2", "backbone_comparison", "efficientnet_b4.csv")
-    pred = infer_dataset(weighted, dataset, device, out_csv, num_workers, batch_size=batch_size, max_samples=1000)
+    pred = infer_dataset(
+        weighted,
+        dataset,
+        device,
+        out_csv,
+        num_workers,
+        batch_size=batch_size,
+        max_samples=BACKBONE_COMPARISON_SAMPLE_CAP,
+    )
     srcc, plcc, _ = compute_srcc_plcc(pred["pred"], pred["gt"])
     result = {"backbone": "efficientnet_b4", "srcc": srcc, "plcc": plcc, "predictions": out_csv}
     safe_mkdir(os.path.join(out_dir, "phase2"))
@@ -475,7 +497,7 @@ def run_geometric_robustness(dataset: Dataset, out_dir: str, device: torch.devic
 
 
 def run_complexity_analysis(dataset: Dataset, out_dir: str, num_workers: int):
-    tfm_dataset = Subset(dataset, list(range(min(100, len(dataset)))))
+    tfm_dataset = Subset(dataset, list(range(min(COMPLEXITY_ANALYSIS_SAMPLE_SIZE, len(dataset)))))
     results = []
     for device_name in ["cpu", "cuda"]:
         if device_name == "cuda" and not torch.cuda.is_available():
@@ -632,25 +654,25 @@ def main():
 
     if "phase2" in args.phase:
         tasks.append(("phase2", "phase2_weight_map_ablation_tid2013", lambda: run_weight_map_ablation(
-            datasets["TID2013"], output_dir, device, args.num_workers, args.batch_size
+            datasets[ABLATION_DATASET], output_dir, device, args.num_workers, args.batch_size
         )))
         tasks.append(("phase2", "phase2_patch_window_sensitivity_tid2013", lambda: run_patch_window_sensitivity(
-            datasets["TID2013"], output_dir, device, args.num_workers, args.batch_size
+            datasets[ABLATION_DATASET], output_dir, device, args.num_workers, args.batch_size
         )))
         tasks.append(("phase2", "phase2_threshold_ablation_tid2013", lambda: run_threshold_ablation(
-            datasets["TID2013"], output_dir, device, args.num_workers, args.batch_size
+            datasets[ABLATION_DATASET], output_dir, device, args.num_workers, args.batch_size
         )))
         if args.run_optional:
             tasks.append(("phase2", "phase2_backbone_comparison_tid2013", lambda: run_backbone_comparison(
-                datasets["TID2013"], output_dir, device, args.num_workers, args.batch_size
+                datasets[ABLATION_DATASET], output_dir, device, args.num_workers, args.batch_size
             )))
 
     if "phase3" in args.phase:
         tasks.append(("phase3", "phase3_geometric_robustness_tid2013", lambda: run_geometric_robustness(
-            datasets["TID2013"], output_dir, device, args.num_workers, args.batch_size
+            datasets[ABLATION_DATASET], output_dir, device, args.num_workers, args.batch_size
         )))
         tasks.append(("phase3", "phase3_complexity_analysis_tid2013", lambda: run_complexity_analysis(
-            datasets["TID2013"], output_dir, args.num_workers
+            datasets[ABLATION_DATASET], output_dir, args.num_workers
         )))
         if args.run_optional:
             tasks.append(("phase3", "phase3_cross_dataset_generalization", lambda: run_cross_dataset_generalization(
