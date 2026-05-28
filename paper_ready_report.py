@@ -8,6 +8,8 @@ import numpy as np
 
 
 def safe_mkdir(path: str) -> None:
+    if not path:
+        return
     os.makedirs(path, exist_ok=True)
 
 
@@ -293,7 +295,7 @@ def main() -> None:
 
     try:
         import matplotlib.pyplot as plt
-    except Exception as exc:
+    except (ImportError, ModuleNotFoundError) as exc:
         raise RuntimeError("matplotlib is required for plot generation. Install with: pip install matplotlib") from exc
 
     input_dir = os.path.abspath(args.input_dir)
