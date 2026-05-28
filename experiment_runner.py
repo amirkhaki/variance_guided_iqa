@@ -1,5 +1,6 @@
 import argparse
 import csv
+import functools
 import json
 import os
 import random
@@ -21,6 +22,11 @@ from iqa_models import BackboneSpec, IDFIQA, WeightedPatchIDFIQA, get_backbone_e
 
 
 def logistic_func(x, beta1, beta2, beta3, beta4, beta5):
+    """Five-parameter logistic mapping used for PLCC calibration.
+
+    beta1 controls amplitude, beta2 slope, beta3 midpoint, beta4 linear term,
+    and beta5 bias term.
+    """
     logistic_part = beta2 * (x - beta3)
     clipped = np.clip(logistic_part, -100, 100)
     return beta1 * (0.5 - 1 / (1 + np.exp(clipped))) + beta4 * x + beta5
@@ -604,9 +610,21 @@ def main():
     if "phase1" in args.phase:
         for name in ["LIVE", "CSIQ", "TID2013", "KADID-10k", "PIPAL", "JPEG AIC-4"]:
             if name in datasets:
-                tasks.append(("phase1", f"phase1_{name}", lambda n=name: run_phase1_dataset(
-                    n, datasets[n], output_dir, device, args.num_workers, args.batch_size
-                )))
+                tasks.append(
+                    (
+                        "phase1",
+                        f"phase1_{name}",
+                        functools.partial(
+                            run_phase1_dataset,
+                            name,
+                            datasets[name],
+                            output_dir,
+                            device,
+                            args.num_workers,
+                            args.batch_size,
+                        ),
+                    )
+                )
         tasks.append(("phase1", "phase1_main_table", None))
 
     if "phase2" in args.phase:
@@ -665,4 +683,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

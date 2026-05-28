@@ -140,6 +140,8 @@ class WeightedPatchIDFIQA(IDFIQA):
         self.patch_size = patch_size
         self.aggregation = aggregation
         self.softmax_temperature = softmax_temperature
+        if self.aggregation == "softmax" and self.softmax_temperature <= 0:
+            raise ValueError("softmax_temperature must be > 0 for softmax aggregation.")
 
     def _get_weight_map(self, ref_img: torch.Tensor, shape_hw: Tuple[int, int]) -> torch.Tensor:
         out = self.weight_extractor(self.normalize(ref_img.to(self.device)))
@@ -209,4 +211,3 @@ class WeightedPatchIDFIQA(IDFIQA):
         weights = torch.stack(patch_weights, dim=1)
         weights = weights / (weights.sum(dim=1, keepdim=True) + self.xi)
         return torch.sum(scores * weights, dim=1)
-
