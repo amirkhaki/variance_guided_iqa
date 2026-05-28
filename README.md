@@ -578,3 +578,28 @@ python experiment_runner.py \
 # Re-run completed tasks
 python experiment_runner.py --output-dir ./experiment_results --force
 ```
+
+### Generate paper-ready tables and plots
+
+After `experiment_runner.py` finishes, generate publication-ready summary artifacts directly from `experiment_results/`:
+
+```bash
+python paper_ready_report.py --input-dir ./experiment_results
+```
+
+This creates `experiment_results/paper_ready/` with:
+
+- Phase 1 main comparison tables (`.csv` and `.md`) and SRCC/PLCC comparison plots
+- Phase 2 ablation tables plus threshold and patch/window plots
+- Phase 3 robustness/complexity tables and summary plots
+- Optional cross-dataset table when that phase result is available
+
+Optional arguments:
+
+```bash
+python paper_ready_report.py \
+  --input-dir ./experiment_results \
+  --output-dir ./paper_artifacts \
+  --plot-format pdf \
+  --dpi 300
+```
