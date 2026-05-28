@@ -1,4 +1,5 @@
 import argparse
+import copy
 import csv
 import functools
 import json
@@ -19,6 +20,10 @@ from torchvision.transforms import functional as TF
 from tqdm import tqdm
 
 from iqa_models import BackboneSpec, IDFIQA, WeightedPatchIDFIQA, get_backbone_extractors
+
+
+BASE_IQADATASETS = ["LIVE", "CSIQ", "TID2013", "KADID-10k", "PIPAL"]
+PHASE1_DATASETS = ["LIVE", "CSIQ", "TID2013", "KADID-10k", "PIPAL", "JPEG AIC-4"]
 
 
 def logistic_func(x, beta1, beta2, beta3, beta4, beta5):
@@ -229,7 +234,7 @@ def build_models(
     spec = BackboneSpec(backbone_name=backbone, feature_layer=feature_layer, weight_layer=weight_layer)
     feat_extractor, weight_extractor, normalize, node_key = get_backbone_extractors(spec)
     baseline = IDFIQA(
-        feature_extractor=feat_extractor,
+        feature_extractor=copy.deepcopy(feat_extractor),
         normalize=normalize,
         feature_node_key=node_key,
         percent_features_to_keep=percent,
@@ -237,13 +242,11 @@ def build_models(
         device=device,
     )
 
-    spec_w = BackboneSpec(backbone_name=backbone, feature_layer=feature_layer, weight_layer=weight_layer)
-    feat_extractor_w, weight_extractor_w, normalize_w, node_key_w = get_backbone_extractors(spec_w)
     weighted = WeightedPatchIDFIQA(
-        feature_extractor=feat_extractor_w,
-        weight_extractor=weight_extractor_w,
-        normalize=normalize_w,
-        feature_node_key=node_key_w,
+        feature_extractor=feat_extractor,
+        weight_extractor=weight_extractor,
+        normalize=normalize,
+        feature_node_key=node_key,
         weight_node_key="weights",
         percent_features_to_keep=percent,
         window_size=window,
@@ -361,6 +364,7 @@ def run_patch_window_sensitivity(dataset: Dataset, out_dir: str, device: torch.d
             )
             out_csv = os.path.join(out_dir, "phase2", "patch_window_sensitivity", f"patch{patch}_window{window}.csv")
             start = time.perf_counter()
+            # Use a capped subset for this dense grid so one full sweep remains practical.
             pred = infer_dataset(weighted, dataset, device, out_csv, num_workers, batch_size=batch_size, max_samples=500)
             elapsed = time.perf_counter() - start
             srcc, plcc, _ = compute_srcc_plcc(pred["pred"], pred["gt"])
@@ -600,15 +604,14 @@ def main():
     state = load_state(state_file)
 
     datasets: Dict[str, Dataset] = {}
-    required_base = ["LIVE", "CSIQ", "TID2013", "KADID-10k", "PIPAL"]
-    for name in required_base:
+    for name in BASE_IQADATASETS:
         datasets[name] = load_iqadataset(name)
     if args.jpeg_aic_root and args.jpeg_aic_manifest:
         datasets["JPEG AIC-4"] = load_jpeg_aic_dataset(args.jpeg_aic_root, args.jpeg_aic_manifest)
 
     tasks = []
     if "phase1" in args.phase:
-        for name in ["LIVE", "CSIQ", "TID2013", "KADID-10k", "PIPAL", "JPEG AIC-4"]:
+        for name in PHASE1_DATASETS:
             if name in datasets:
                 tasks.append(
                     (
@@ -661,7 +664,7 @@ def main():
             continue
         if fn is None and task_name == "phase1_main_table":
             rows = []
-            for name in ["LIVE", "CSIQ", "TID2013", "KADID-10k", "PIPAL", "JPEG AIC-4"]:
+            for name in PHASE1_DATASETS:
                 p = os.path.join(output_dir, "phase1", f"{name}_summary.json")
                 if os.path.exists(p):
                     with open(p, "r") as f:
