@@ -533,3 +533,48 @@ head -n 10 results.csv
 # 4. Deactivate when done
 deactivate
 ```
+
+---
+
+## Resumable Multi-Phase Experiments
+
+Use `experiment_runner.py` to run the full research checklist (phases 1-3) in a resumable way with saved raw predictions for later scatterplots.
+
+### Key behavior
+
+- Uses `iqadataset` for LIVE, CSIQ, TID2013, KADID-10k, and PIPAL
+- Supports JPEG AIC-4 via CLI path + manifest CSV
+- Runs both no-patch baseline and patch-weighted variants
+- Saves per-sample predictions (`pred`, `gt`) and summary JSON files
+- Tracks progress in a state file so interrupted runs can resume
+
+### JPEG AIC-4 manifest format
+
+Create a CSV file with this exact header:
+
+```csv
+ref_img,dist_img,score
+source/img001.png,distorted/img001_q10.png,72.4
+```
+
+`ref_img` and `dist_img` must be paths relative to `--jpeg-aic-root`.
+
+### Run examples
+
+```bash
+# Run all non-optional tasks, resumable
+python experiment_runner.py \
+  --output-dir ./experiment_results \
+  --phase phase1 phase2 phase3
+
+# Add JPEG AIC-4 and optional tasks (backbone + cross-dataset)
+python experiment_runner.py \
+  --output-dir ./experiment_results \
+  --phase phase1 phase2 phase3 \
+  --jpeg-aic-root /path/to/jpeg-aic4 \
+  --jpeg-aic-manifest /path/to/jpeg-aic4_manifest.csv \
+  --run-optional
+
+# Re-run completed tasks
+python experiment_runner.py --output-dir ./experiment_results --force
+```

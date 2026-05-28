@@ -1,0 +1,2 @@
+ref_img,dist_img,score
+source/example_ref.png,distorted/example_dist.png,0.0
