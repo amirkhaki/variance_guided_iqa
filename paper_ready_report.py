@@ -278,7 +278,7 @@ def process_phase3(input_dir: str, output_dir: str, plt, dpi: int, plot_ext: str
     cross_path = maybe_path(os.path.join(phase3_dir, "cross_dataset_generalization.json"))
     if cross_path:
         data = load_json(cross_path)
-        rows = [{"dataset": "TID2013(tuning)", "srcc": data["best"]["srcc"], "plcc": data["best"]["plcc"]}]
+        rows = [{"dataset": "TID2013 (tuning set)", "srcc": data["best"]["srcc"], "plcc": data["best"]["plcc"]}]
         rows.extend({"dataset": r["dataset"], "srcc": r["srcc"], "plcc": r["plcc"]} for r in data.get("tests", []))
         out_csv = os.path.join(output_dir, "phase3_cross_dataset_generalization.csv")
         write_csv(out_csv, ["dataset", "srcc", "plcc"], rows)
